@@ -16,21 +16,22 @@ class BatchDrawer {
         this.maxLines = params.maxLines == null ? 10000 : params.maxLines;
         this.maxDots = params.maxDots == null ? 10000 : params.maxDots;
         this.forceGL1 = params.forceGL1 == null ? false : params.forceGL1;
-        this.clearColor = params.clearColor == null ? {r: 0, g: 0, b: 0, a: 1} : params.clearColor;
-        switch(params.coordinateSystem) {
-        case null:
-        case "pixels":
-            this.coordinateSystem = this.PIXELS;
-            break;
-        case "ndc":
-            this.coordinateSystem = this.NDC;
-            break;
-        case "wgs84":
-            this.coordinateSystem = this.WGS84;
-            break;
-        default:
-            this.error = "Unrecognized coordinate system. Use pixels, ndc or wgs84!";
-            return;
+        this.clearColor = params.clearColor == null ? { r: 0, g: 0, b: 0, a: 1 } : params.clearColor;
+        switch (params.coordinateSystem) {
+            case null:
+            case undefined:
+            case "pixels":
+                this.coordinateSystem = this.PIXELS;
+                break;
+            case "ndc":
+                this.coordinateSystem = this.NDC;
+                break;
+            case "wgs84":
+                this.coordinateSystem = this.WGS84;
+                break;
+            default:
+                this.error = "Unrecognized coordinate system. Use pixels, ndc or wgs84!";
+                return;
         }
 
         // Init variables
@@ -39,7 +40,7 @@ class BatchDrawer {
         this.numDots = 0;
         this.zoomLevel = 1;
         this.zoomScale = 256 * Math.pow(2, this.zoomLevel);
-        this.pixelOrigin = {x: 0, y: 0};
+        this.pixelOrigin = { x: 0, y: 0 };
 
         if (!this._initGLContext()) {
             return;
@@ -82,7 +83,7 @@ class BatchDrawer {
             try {
                 this.GL = this.canvas.getContext("webgl2");
                 this.GLVersion = 2;
-            } catch(e) {
+            } catch (e) {
                 console.log("Could not create a WebGL2 context.");
             }
         }
@@ -93,7 +94,7 @@ class BatchDrawer {
                 this.GL = this.canvas.getContext("webgl");
                 this.ext = this.GL.getExtension("ANGLE_instanced_arrays");
                 this.GLVersion = 1;
-            } catch(e) {
+            } catch (e) {
                 console.log("Could not create a WebGL1 context.");
             }
         }
@@ -104,7 +105,7 @@ class BatchDrawer {
                 this.GL = this.canvas.getContext("experimental-webgl");
                 this.ext = this.GL.getExtension("ANGLE_instanced_arrays");
                 this.GLVersion = 1;
-            } catch(e) {
+            } catch (e) {
                 console.log("Could not create an experimental-WebGL1 context.");
             }
         }
@@ -120,14 +121,14 @@ class BatchDrawer {
 
     _initBuffers() {
         // Initialize constant vertex positions for lines and dots:
-        this.lineVertexBuffer = this._initArrayBuffer(new Float32Array([-0.5,  0.5,  1.0,
-                                                                        -0.5, -0.5,  1.0,
-                                                                         0.5,  0.5,  1.0,
-                                                                         0.5, -0.5,  1.0]), 3);
-        this.dotVertexBuffer = this._initArrayBuffer(new Float32Array([-0.5,  0.0,  1.0,
-                                                                        0.0, -0.5,  1.0,
-                                                                        0.0,  0.5,  1.0,
-                                                                        0.5,  0.0,  1.0]), 3);
+        this.lineVertexBuffer = this._initArrayBuffer(new Float32Array([-0.5, 0.5, 1.0,
+        -0.5, -0.5, 1.0,
+            0.5, 0.5, 1.0,
+            0.5, -0.5, 1.0]), 3);
+        this.dotVertexBuffer = this._initArrayBuffer(new Float32Array([-0.5, 0.0, 1.0,
+            0.0, -0.5, 1.0,
+            0.0, 0.5, 1.0,
+            0.5, 0.0, 1.0]), 3);
 
         // Initialize Float32Arrays for CPU storage:
         this.lineStartArray = new Float32Array(this.maxLines * 2);
@@ -162,7 +163,7 @@ class BatchDrawer {
     _createShaderProgram(vertexSource, fragmentSource, shape) {
         let vertexShader = this._compileShader(vertexSource, this.GL.VERTEX_SHADER);
         let fragmentShader = this._compileShader(fragmentSource, this.GL.FRAGMENT_SHADER);
-        if (!vertexShader || ! fragmentShader) {
+        if (!vertexShader || !fragmentShader) {
             return false;
         }
 
@@ -209,8 +210,8 @@ class BatchDrawer {
 
     _initUniforms() {
         let projection = new Float32Array([2 / this.canvas.width, 0, 0,
-                                           0, -2 / this.canvas.height, 0,
-                                          -1, 1, 1]);
+            0, -2 / this.canvas.height, 0,
+        -1, 1, 1]);
         let resScaleX = 1;
         let resScaleY = 1;
         if (this.coordinateSystem == this.NDC) {
@@ -281,27 +282,27 @@ class BatchDrawer {
 
 
     addLine(startX, startY, endX, endY, width, colorR, colorG, colorB, colorA) {
-        this.lineStartArray[2*this.numLines] = startX;
-        this.lineStartArray[2*this.numLines+1] = startY;
-        this.lineEndArray[2*this.numLines] = endX;
-        this.lineEndArray[2*this.numLines+1] = endY;
+        this.lineStartArray[2 * this.numLines] = startX;
+        this.lineStartArray[2 * this.numLines + 1] = startY;
+        this.lineEndArray[2 * this.numLines] = endX;
+        this.lineEndArray[2 * this.numLines + 1] = endY;
         this.lineWidthArray[this.numLines] = width;
-        this.lineColorArray[4*this.numLines] = colorR;
-        this.lineColorArray[4*this.numLines+1] = colorG;
-        this.lineColorArray[4*this.numLines+2] = colorB;
-        this.lineColorArray[4*this.numLines+3] = colorA;
+        this.lineColorArray[4 * this.numLines] = colorR;
+        this.lineColorArray[4 * this.numLines + 1] = colorG;
+        this.lineColorArray[4 * this.numLines + 2] = colorB;
+        this.lineColorArray[4 * this.numLines + 3] = colorA;
         this.numLines++;
     }
 
 
     addDot(posX, posY, size, colorR, colorG, colorB, colorA) {
-        this.dotPosArray[2*this.numDots] = posX;
-        this.dotPosArray[2*this.numDots+1] = posY;
+        this.dotPosArray[2 * this.numDots] = posX;
+        this.dotPosArray[2 * this.numDots + 1] = posY;
         this.dotSizeArray[this.numDots] = size;
-        this.dotColorArray[4*this.numDots] = colorR;
-        this.dotColorArray[4*this.numDots+1] = colorG;
-        this.dotColorArray[4*this.numDots+2] = colorB;
-        this.dotColorArray[4*this.numDots+3] = colorA;
+        this.dotColorArray[4 * this.numDots] = colorR;
+        this.dotColorArray[4 * this.numDots + 1] = colorG;
+        this.dotColorArray[4 * this.numDots + 2] = colorB;
+        this.dotColorArray[4 * this.numDots + 3] = colorA;
         this.numDots++;
     }
 
@@ -348,13 +349,13 @@ class BatchDrawer {
         this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineStartArray, 0, this.numLines * 2);
 
         this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineEndBuffer);
-        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineEndArray , 0, this.numLines * 2);
+        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineEndArray, 0, this.numLines * 2);
 
         this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineWidthBuffer);
-        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineWidthArray , 0, this.numLines * 1);
+        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineWidthArray, 0, this.numLines * 1);
 
         this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineColorBuffer);
-        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineColorArray , 0, this.numLines * 4);
+        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineColorArray, 0, this.numLines * 4);
     }
 
 
@@ -507,7 +508,7 @@ class BatchDrawer {
         let dotVertexSource = null;
 
         if (this.GLVersion == 2) {
-            fragSource =   `#version 300 es
+            fragSource = `#version 300 es
                             precision highp float;
                             in vec4 color;
                             out vec4 fragmentColor;
@@ -558,7 +559,7 @@ class BatchDrawer {
                                     gl_Position = vec4(projection * translate *  rotate *  scale * vertexPos, 1.0);
                                 }`;
 
-            dotVertexSource =    `#version 300 es
+                dotVertexSource = `#version 300 es
                                   precision highp float;
                                   layout(location = 0) in vec3 vertexPos;
                                   layout(location = 1) in vec2 inDotPos;
@@ -749,7 +750,7 @@ class BatchDrawer {
                                     gl_Position = vec4(projection * translate *  rotate *  scale * vertexPos, 1.0);
                                 }`;
 
-            dotVertexSource =    `#version 300 es
+                dotVertexSource = `#version 300 es
                                   #define M_PI 3.1415926535897932384626433832795
                                   precision highp float;
                                   layout(location = 0) in vec3 vertexPos;
