@@ -1,10 +1,32 @@
 
+let batch = null
 function main() {
     var N = 10000;
     var lines = generateLines(N);
 
     //timeCanvas2D(lines, N);
     timeBatchDraw(lines, N);
+    console.log('done')
+    const canvas = document.getElementById("canvas");
+    canvas.onmousemove = (ev) => {
+        
+        const screenHeight = canvas.height
+        const {offsetX:x, offsetY:y} = ev
+
+        const gl = batch.GL;
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, batch.fbo);
+        gl.readBuffer(gl.COLOR_ATTACHMENT1);
+        gl.readPixels(x, screenHeight - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, readPixelBuffer)
+        //console.log(readPixelBuffer)
+        const [objectID, instanceID] = decodeID(readPixelBuffer)
+        if( /*objectID == 0*/ false) {
+            readPixelBuffer.set([255,255,255,255]);
+            console.log('[Not Selected]')
+        }
+        else {
+            console.log(`Object ID: ${objectID}, Instance ID: ${instanceID}`)
+        }
+    }
 }
 
 
@@ -35,6 +57,7 @@ function timeBatchDraw(lines, N) {
         clearColor: {r: 1, g: 1, b: 1, a: 1}
     };
     let batchDrawer = new BatchDrawer(canvas, params);
+    batch = batchDrawer
 
     if (batchDrawer.error != null) {
         console.log(batchDrawer.error);
@@ -68,3 +91,11 @@ function timeCanvas2D(lines, N) {
     }
     console.timeEnd("Canvas2D");
 }
+
+const readPixelBuffer = new Uint8Array([0, 255, 255, 255])
+const decodeID = (buf)=>{
+    const objectID = buf[0] | (buf[1] << 8)
+    const instanceID = buf[2] | (buf[3] << 8)
+    return [objectID, instanceID]
+}
+
