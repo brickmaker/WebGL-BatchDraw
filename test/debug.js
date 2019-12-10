@@ -26,7 +26,7 @@ function main() {
         batchDrawer.addLine(0.5, 0.444, 0.2, 0.444, 0.01, 0.8, 0.1, 0.7, 0.5);
         batchDrawer.addLine(0.3, 0.2, 0.3, 0.8, 0.01, 0.8, 0.1, 0.7, 0.5);
         batchDrawer.addLine(0.4, 0.2, 0.2, 0.7, 0.01, 0.8, 0.1, 0.7, 0.5);
-        //batchDrawer.addDot(0.3, 0.5, 0.05, 0.1, 0.7, 1, 1);
+        batchDrawer.addDot(0.3, 0.5, 0.05, 0.1, 0.7, 1, 1);
 
         // In Long-Lat (WGS 84)
 

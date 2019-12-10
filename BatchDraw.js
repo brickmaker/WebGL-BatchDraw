@@ -383,25 +383,25 @@ class BatchDrawer {
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo)
         gl.readBuffer(gl.COLOR_ATTACHMENT0);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, colorBuffer)
-        console.log(colorBuffer)
+        // console.log(colorBuffer)
 
         const idBuf = new Uint8Array(width * height * 4)
 
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo)
         gl.readBuffer(gl.COLOR_ATTACHMENT1);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, idBuf)
-        console.log(idBuf)
+        // console.log(idBuf)
         let cnt  = 0;
         for(let i = 0; i <  colorBuffer.length; ++i) {
             if(colorBuffer[i] != 0) {
-                if(cnt % 100 == 0) {
-                    console.log(colorBuffer[i])
-                }
+                // if(cnt % 100 == 0) {
+                    // console.log(colorBuffer[i])
+                // }
                 
                 cnt ++;
             }
         }
-        console.log(cnt);
+        // console.log(cnt);
 
 
         gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null)
