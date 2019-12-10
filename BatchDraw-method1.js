@@ -16,7 +16,7 @@ class BatchDrawer {
         this.maxLines = params.maxLines == null ? 10000 : params.maxLines;
         this.maxDots = params.maxDots == null ? 10000 : params.maxDots;
         this.forceGL1 = params.forceGL1 == null ? false : params.forceGL1;
-        this.clearColor = params.clearColor == null ? { r: 0, g: 0, b: 0, a: 1 } : params.clearColor;
+        this.clearColor = params.clearColor == null ? { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } : params.clearColor;
         switch (params.coordinateSystem) {
             case null:
             case undefined:
@@ -53,12 +53,17 @@ class BatchDrawer {
         this.LINE_WIDTH_BUF = 3;
         this.LINE_COLOR_BUF = 4;
 
+        // **************************
+        this.LINE_ID_BUF = 5;
+        // **************************
+
         this.DOT_VX_BUF = 0;
         this.DOT_POS_BUF = 1;
         this.DOT_SIZE_BUF = 2;
         this.DOT_COLOR_BUF = 3;
 
         if (!this._initShaders()) {
+            console.log('init shader failed')
             return;
         }
 
@@ -72,6 +77,11 @@ class BatchDrawer {
         this._initBuffers();
 
         this._initUniforms();
+
+        // ****************************************
+        //TODO: this should be done every time canvas is resized
+        this._initIdFramebuffer()
+        // ****************************************
     }
 
 
@@ -135,6 +145,9 @@ class BatchDrawer {
         this.lineEndArray = new Float32Array(this.maxLines * 2);
         this.lineWidthArray = new Float32Array(this.maxLines);
         this.lineColorArray = new Float32Array(this.maxLines * 4);
+        
+        // **************************************************
+        this.lineIdArray = new Float32Array(this.maxLines*4)
 
         this.dotPosArray = new Float32Array(this.maxDots * 2);
         this.dotSizeArray = new Float32Array(this.maxDots);
@@ -145,6 +158,9 @@ class BatchDrawer {
         this.lineEndBuffer = this._initArrayBuffer(this.lineEndArray, 2);
         this.lineWidthBuffer = this._initArrayBuffer(this.lineWidthArray, 1);
         this.lineColorBuffer = this._initArrayBuffer(this.lineColorArray, 4);
+
+        // ******************************************
+        this.lineIdBuffer = this._initArrayBuffer(this.lineIdArray, 4);
 
         this.dotPosBuffer = this._initArrayBuffer(this.dotPosArray, 2);
         this.dotSizeBuffer = this._initArrayBuffer(this.dotSizeArray, 1);
@@ -164,8 +180,12 @@ class BatchDrawer {
         let vertexShader = this._compileShader(vertexSource, this.GL.VERTEX_SHADER);
         let fragmentShader = this._compileShader(fragmentSource, this.GL.FRAGMENT_SHADER);
         if (!vertexShader || !fragmentShader) {
+            if(!vertexShader) {
+                console.log(this.error)
+            }
             return false;
         }
+
 
         let program = this.GL.createProgram();
 
@@ -176,6 +196,7 @@ class BatchDrawer {
             this.GL.bindAttribLocation(program, this.LINE_END_BUF, 'inLineEnd');
             this.GL.bindAttribLocation(program, this.LINE_WIDTH_BUF, 'inLineWidth');
             this.GL.bindAttribLocation(program, this.LINE_COLOR_BUF, 'lineColor');
+            this.GL.bindAttribLocation(program, this.LINE_ID_BUF, 'instance');
         } else if (shape === 'dot') {
             this.GL.bindAttribLocation(program, this.DOT_VX_BUF, 'vertexPos');
             this.GL.bindAttribLocation(program, this.DOT_POS_BUF, 'inDotPos');
@@ -220,7 +241,7 @@ class BatchDrawer {
         }
 
         this.GL.viewport(0, 0, this.canvas.width, this.canvas.height);
-
+        
         this.GL.useProgram(this.lineProgram);
         let lineProjLoc = this.GL.getUniformLocation(this.lineProgram, 'projection');
         this.GL.uniformMatrix3fv(lineProjLoc, false, projection);
@@ -280,6 +301,13 @@ class BatchDrawer {
         }
     }
 
+    _encodeInt(v) {
+        let r = (v & 255)/255.0,
+            g = ((v>>8)&255)/255.0,
+            b = ((v>>16)&255)/255.0,
+            a = ((v>>24)&255)/255.0;
+        return [r, g, b, a];
+    }
 
     addLine(startX, startY, endX, endY, width, colorR, colorG, colorB, colorA) {
         this.lineStartArray[2 * this.numLines] = startX;
@@ -291,6 +319,13 @@ class BatchDrawer {
         this.lineColorArray[4 * this.numLines + 1] = colorG;
         this.lineColorArray[4 * this.numLines + 2] = colorB;
         this.lineColorArray[4 * this.numLines + 3] = colorA;
+
+        const [r, g, b, a] = this._encodeInt(this.numLines)
+        this.lineIdArray[4 * this.numLines] = r;
+        this.lineIdArray[4 * this.numLines + 1] = g;
+        this.lineIdArray[4 * this.numLines + 2] = b;
+        this.lineIdArray[4 * this.numLines + 3] = a;
+        
         this.numLines++;
     }
 
@@ -309,6 +344,11 @@ class BatchDrawer {
 
     draw(keepOld) {
         keepOld = keepOld == null ? false : keepOld;
+
+        const gl = this.GL;
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fbo)
+
+        gl.clearColor(0.0, 0.0, 0.0, 0.0)
 
         // Clear screen:
         this.GL.clear(this.GL.COLOR_BUFFER_BIT);
@@ -336,11 +376,54 @@ class BatchDrawer {
                 this._drawDotsGL1();
             }
         }
+        
+        const {width, height} = this.canvas
+        const colorBuffer = new Uint8Array(width * height * 4)
+
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo)
+        gl.readBuffer(gl.COLOR_ATTACHMENT0);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, colorBuffer)
+        // console.log(colorBuffer)
+
+        const idBuf = new Uint8Array(width * height * 4)
+
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo)
+        gl.readBuffer(gl.COLOR_ATTACHMENT1);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, idBuf)
+        // console.log(idBuf)
+        let cnt  = 0;
+        for(let i = 0; i <  colorBuffer.length; ++i) {
+            if(colorBuffer[i] != 0) {
+                // if(cnt % 100 == 0) {
+                    // console.log(colorBuffer[i])
+                // }
+                
+                cnt ++;
+            }
+        }
+        // console.log(cnt);
+
+
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null)
+        gl.clearColor(0.0, 0.0, 0.0, 0.0)
+
+        // Clear screen:
+        this.GL.clear(this.GL.COLOR_BUFFER_BIT);
+        
+        gl.useProgram(this.shader_2ndpass)
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, this.texColorBuffer)
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, this.idBuffer)
+        gl.bindVertexArray(this.quadVAO)
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
         if (!keepOld) {
             // Don't keep old elements for next draw call
             this.numLines = 0;
             this.numDots = 0;
         }
+
     }
 
 
@@ -356,6 +439,9 @@ class BatchDrawer {
 
         this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineColorBuffer);
         this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineColorArray, 0, this.numLines * 4);
+
+        this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineIdBuffer);
+        this.GL.bufferSubData(this.GL.ARRAY_BUFFER, 0, this.lineIdArray, 0, this.numLines * 4);
     }
 
 
@@ -374,12 +460,14 @@ class BatchDrawer {
     _drawLinesGL2() {
         // Use line drawing shaders:
         this.GL.useProgram(this.lineProgram);
+        //this.GL.bindFramebuffer(this.GL.FRAMEBUFFER, this.fbo)
 
         this.GL.enableVertexAttribArray(this.LINE_VX_BUF);
         this.GL.enableVertexAttribArray(this.LINE_START_BUF);
         this.GL.enableVertexAttribArray(this.LINE_END_BUF);
         this.GL.enableVertexAttribArray(this.LINE_WIDTH_BUF);
         this.GL.enableVertexAttribArray(this.LINE_COLOR_BUF);
+        this.GL.enableVertexAttribArray(this.LINE_ID_BUF);
 
         // Bind all line vertex buffers:
         this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineVertexBuffer);
@@ -400,6 +488,12 @@ class BatchDrawer {
         this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineColorBuffer);
         this.GL.vertexAttribPointer(this.LINE_COLOR_BUF, 4, this.GL.FLOAT, false, 16, 0);
         this.GL.vertexAttribDivisor(this.LINE_COLOR_BUF, 1);
+        
+        // ****************************************
+        this.GL.bindBuffer(this.GL.ARRAY_BUFFER, this.lineIdBuffer);
+        this.GL.vertexAttribPointer(this.LINE_ID_BUF, 4, this.GL.FLOAT, false, 16, 0);
+        this.GL.vertexAttribDivisor(this.LINE_ID_BUF, 1);
+        // ****************************************
 
         // Draw all line instances:
         this.GL.drawArraysInstanced(this.GL.TRIANGLE_STRIP, 0, 4, this.numLines);
@@ -507,15 +601,32 @@ class BatchDrawer {
         let fragSource = null;
         let dotVertexSource = null;
 
+        // *****************************
+        let fragOldSource = null;
+        // *****************************
+
         if (this.GLVersion == 2) {
             fragSource = `#version 300 es
+                            precision highp float; // refuse to compile if not added
+                            layout (location=0) out vec4 gColor;
+                            layout (location=1) out vec4 gId;
+
+                            in vec4 color;
+                            in vec4 instanceID;
+                            
+                            void main(void) {
+                                gColor = color;
+                                gId = instanceID;
+                            }`;
+            fragOldSource = `#version 300 es
                             precision highp float;
                             in vec4 color;
-                            out vec4 fragmentColor;
+                            out vec4 gColor;
 
                             void main(void) {
-                                fragmentColor = color;
+                                gColor = color;
                             }`;
+
             if (this.coordinateSystem != this.WGS84) {
                 lineVertexSource = `#version 300 es
                                 precision highp float;
@@ -524,13 +635,17 @@ class BatchDrawer {
                                 layout(location = 2) in vec2 inLineEnd;
                                 layout(location = 3) in float inLineWidth;
                                 layout(location = 4) in vec4 lineColor;
-
+                                layout(location = 5) in vec4 instance;
+                                
                                 out vec4 color;
+                                out vec4 instanceID;
 
                                 uniform mat3 projection;
                                 uniform vec2 resolutionScale;
 
                                 void main(void) {
+                                    instanceID = instance;
+
                                     color = lineColor;
 
                                     vec2 lineStart = inLineStart * resolutionScale;
@@ -558,7 +673,7 @@ class BatchDrawer {
 
                                     gl_Position = vec4(projection * translate *  rotate *  scale * vertexPos, 1.0);
                                 }`;
-
+                
                 dotVertexSource = `#version 300 es
                                   precision highp float;
                                   layout(location = 0) in vec3 vertexPos;
@@ -957,7 +1072,134 @@ class BatchDrawer {
 
 
         this.lineProgram = this._createShaderProgram(lineVertexSource, fragSource, 'line');
-        this.dotProgram = this._createShaderProgram(dotVertexSource, fragSource, 'dot');
+        //this.lineIdProgram = this._createShaderProgram(lineIdVertexSource, fragIdSource, 'line', 'isID');
+        this.dotProgram = this._createShaderProgram(dotVertexSource, fragOldSource, 'dot');
+
         return (this.lineProgram != false && this.dotProgram != false);
+    }
+
+    // ****************************************
+    _initIdFramebuffer() {
+        const gl = this.GL
+        const screenWidth = this.canvas.width
+        const screenHeight = this.canvas.height
+
+        const vShader_2ndpass_Src = `#version 300 es
+        layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec2 aTexCoords;
+
+        out vec2 TexCoords;
+
+        void main()
+        {
+            TexCoords = aTexCoords;
+            gl_Position = vec4(aPos, 1.0);
+        }
+        `
+
+        const fShader_2ndpass_Src = `#version 300 es
+        precision highp float;
+        out vec4 FragColor;
+        in vec2 TexCoords;
+        uniform sampler2D gColor;
+        uniform sampler2D gId;
+
+        void main()
+        {
+            FragColor = texture(gColor, TexCoords).rgba;
+        }
+        `
+        const compileShaders = (vertexSrc, fragmentSrc, debugName)=>{
+            const vShader = gl.createShader(gl.VERTEX_SHADER)
+            gl.shaderSource(vShader, vertexSrc)
+            gl.compileShader(vShader)
+            let success = gl.getShaderParameter(vShader, gl.COMPILE_STATUS)
+            if (!success) {
+                throw `could not compile shader [${debugName}]:\n` + gl.getShaderInfoLog(vShader);
+            }
+            const fShader = gl.createShader(gl.FRAGMENT_SHADER)
+            gl.shaderSource(fShader, fragmentSrc)
+            gl.compileShader(fShader)
+            success = gl.getShaderParameter(fShader, gl.COMPILE_STATUS)
+            if (!success) {
+                throw `could not compile shader [${debugName}]:\n` + gl.getShaderInfoLog(fShader);
+            }
+        
+            const shader = gl.createProgram()
+            gl.attachShader(shader, vShader)
+            gl.attachShader(shader, fShader)
+            gl.linkProgram(shader)
+            return shader;
+        }
+
+        const shader_2ndpass = compileShaders(vShader_2ndpass_Src, fShader_2ndpass_Src, "2nd Pass shader")
+        this.shader_2ndpass = shader_2ndpass;
+
+        const quadVertices = new Float32Array([
+            // positions    // texture Coords
+            -1.0,  1.0, 0.0, 0.0, 1.0,
+            -1.0, -1.0, 0.0, 0.0, 0.0,
+             1.0,  1.0, 0.0, 1.0, 1.0,
+             1.0, -1.0, 0.0, 1.0, 0.0,
+        ])
+        
+        const quadVAO = gl.createVertexArray()
+        const quadVBO = gl.createBuffer()
+        gl.bindVertexArray(quadVAO)
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO)
+        gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW)
+        gl.enableVertexAttribArray(0)
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 5*4, 0)
+        gl.enableVertexAttribArray(1)
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 5*4, 3*4)
+        gl.bindVertexArray(null)
+        
+        this.quadVBO = quadVBO
+        this.quadVAO = quadVAO
+
+        const fbo = gl.createFramebuffer()
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+
+        const texColorBuffer = gl.createTexture()
+        gl.bindTexture(gl.TEXTURE_2D, texColorBuffer)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, screenWidth, screenHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR )
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.bindTexture(gl.TEXTURE_2D, null)
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texColorBuffer, 0)
+
+        const idBuffer = gl.createTexture()
+        gl.bindTexture(gl.TEXTURE_2D, idBuffer)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, screenWidth, screenHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR )
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.bindTexture(gl.TEXTURE_2D, null)
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, idBuffer, 0)
+
+        const setUniformInt = (shader, name, value)=>{
+            gl.useProgram(shader)
+            gl.uniform1i(gl.getUniformLocation(shader, name), value)
+        }
+
+        setUniformInt(shader_2ndpass, "gColor", 0);
+        setUniformInt(shader_2ndpass, "gId", 1);
+
+        gl.drawBuffers([0, 1].map(v=>v+gl.COLOR_ATTACHMENT0));
+
+        const rbo = gl.createRenderbuffer()
+        gl.bindRenderbuffer(gl.RENDERBUFFER, rbo)
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, screenWidth, screenHeight)
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null)
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, rbo);
+
+        if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+            throw "Framebuffer not complete";
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+
+        this.fbo = fbo
+        this.texColorBuffer = texColorBuffer
+        this.idBuffer = idBuffer
     }
 }
