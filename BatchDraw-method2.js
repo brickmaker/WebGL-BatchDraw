@@ -488,6 +488,7 @@ class BatchDrawer {
 
         // ****************************************
         const gl = this.GL
+        gl.blendFunc(gl.ONE, gl.ZERO);
         gl.useProgram(this.lineIdProgram)
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
 
@@ -534,6 +535,7 @@ class BatchDrawer {
 
         // ****************************************
         const gl = this.GL
+        gl.blendFunc(gl.ONE, gl.ZERO);
         gl.useProgram(this.dotIdProgram)
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
 
