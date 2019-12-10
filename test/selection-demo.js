@@ -1,5 +1,6 @@
-
+const BATCH_DRAW_METHOD = 2
 let batch = null
+
 function main() {
     var N = 10;
     var lines = generateLines(N);
@@ -15,7 +16,9 @@ function main() {
 
         const gl = batch.GL;
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, batch.fbo);
-        gl.readBuffer(gl.COLOR_ATTACHMENT1);
+        if (BATCH_DRAW_METHOD == 1) {
+            gl.readBuffer(gl.COLOR_ATTACHMENT1);
+        }
         gl.readPixels(x, screenHeight - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, readPixelBuffer)
         //console.log(readPixelBuffer)
         const [objectID, instanceID] = decodeID(readPixelBuffer)
@@ -66,6 +69,7 @@ function timeBatchDraw(lines, N) {
     console.time("BatchDraw");
     for (i = 0; i < N; i++) {
         batchDrawer.addLine(lines[i].fromX, lines[i].fromY, lines[i].toX, lines[i].toY, 3, 1, 0.5, 0.1, 1);
+        // batchDrawer.addDot((lines[i].fromX + lines[i].toX) / 2, (lines[i].fromY + lines[i].toY) / 2, 3 * 4, 1, 0, 0, 1);
     }
     batchDrawer.draw(false);
     console.timeEnd("BatchDraw");
