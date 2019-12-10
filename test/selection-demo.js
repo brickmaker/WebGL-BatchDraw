@@ -67,9 +67,12 @@ function timeBatchDraw(lines, N) {
         return;
     }
     console.time("BatchDraw");
+    let id_acc = 1
     for (i = 0; i < N; i++) {
-        batchDrawer.addLine(lines[i].fromX, lines[i].fromY, lines[i].toX, lines[i].toY, 3, 1, 0.5, 0.1, 1);
-        // batchDrawer.addDot((lines[i].fromX + lines[i].toX) / 2, (lines[i].fromY + lines[i].toY) / 2, 3 * 4, 1, 0, 0, 1);
+        batchDrawer.addLine(lines[i].fromX, lines[i].fromY, lines[i].toX, lines[i].toY, 3, 1, 0.5, 0.1, 1, id_acc);
+        id_acc++;
+        batchDrawer.addDot((lines[i].fromX + lines[i].toX) / 2, (lines[i].fromY + lines[i].toY) / 2, 3 * 4, 1, 0, 0, 1, id_acc);
+        id_acc++;
     }
     batchDrawer.draw(false);
     console.timeEnd("BatchDraw");
